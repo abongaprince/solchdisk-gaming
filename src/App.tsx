@@ -1219,11 +1219,16 @@ const Cart = () => {
 
     try {
       // Create a single order for the whole pack/service
+      const gamesList = items.some((item: any) => item.isPack) 
+        ? JSON.stringify(items.find((item: any) => item.isPack).games.map((g: any) => g.titre))
+        : null;
+
       await axios.post('/api/orders', {
         game_id: items[0]?.isPack ? null : items[0]?.id,
         disque_dur_option: serviceOption,
         livraison_societe,
         preuve_paiement: proofPreview,
+        games_list: gamesList
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -1708,6 +1713,15 @@ const Profile = () => {
                   <img src={order.game_image || 'https://picsum.photos/seed/pack/800/600'} className="w-20 h-20 object-cover rounded-sm" />
                   <div className="flex-1">
                     <h4 className="font-bold uppercase tracking-wider">{order.game_title || (order.disque_dur_option === 'fourni' ? 'Pack SolchDisk' : 'Installation Seule')}</h4>
+                    {order.games_list && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {JSON.parse(order.games_list).map((gameTitle: string, idx: number) => (
+                          <span key={idx} className="text-[8px] bg-white/5 px-2 py-0.5 rounded-full border border-white/5 text-muted">
+                            {gameTitle}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <p className="text-xs text-muted mt-1">Commandé le {new Date(order.date_commande).toLocaleDateString()}</p>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-[10px] uppercase text-muted">Preuve:</span>
@@ -1880,6 +1894,15 @@ const AdminDashboard = () => {
                   </td>
                   <td className="py-6 px-4">
                     <p className="text-sm text-neon-blue uppercase font-bold">{order.game_title || (order.disque_dur_option === 'fourni' ? 'Pack SolchDisk' : 'Installation Seule')}</p>
+                    {order.games_list && (
+                      <div className="mt-2 flex flex-wrap gap-1 max-w-[200px]">
+                        {JSON.parse(order.games_list).map((gameTitle: string, idx: number) => (
+                          <span key={idx} className="text-[8px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 text-muted">
+                            {gameTitle}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       <span className="text-[9px] px-2 py-0.5 bg-white/5 border border-white/10 text-muted uppercase">
                         Disque: {order.disque_dur_option === 'fourni' ? 'Fourni' : 'Client'}
