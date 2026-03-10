@@ -5,10 +5,59 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = new Database('database.db');
 const JWT_SECRET = process.env.JWT_SECRET || 'solchdisk-gaming-secret-key-2024';
+
+// Email Transporter (Lazy Initialization)
+let transporter: any = null;
+
+async function sendEmail(to: string, subject: string, html: string) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.SMTP_HOST) {
+    console.log('Email skipped: SMTP credentials not fully configured (USER, PASS, or HOST missing).');
+    return;
+  }
+
+  if (!transporter) {
+    console.log(`Initializing SMTP transporter with host: ${process.env.SMTP_HOST}, port: ${process.env.SMTP_PORT}, user: ${process.env.SMTP_USER}`);
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_PORT === '465',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: {
+        // Do not fail on invalid certs (common with some SMTP providers)
+        rejectUnauthorized: false
+      }
+    });
+  }
+
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'SolchDisk Gaming <no-reply@solchdisk.com>',
+      to,
+      subject,
+      html,
+    });
+    console.log(`Email sent to ${to}`);
+  } catch (error: any) {
+    if (error.code === 'EAUTH') {
+      console.error('SMTP Authentication Error: The username or password was rejected.');
+      console.error('IMPORTANT: If you are using Gmail, you MUST use an "App Password", not your regular password.');
+      console.error('Visit https://myaccount.google.com/apppasswords to generate one.');
+    } else {
+      console.error('Error sending email:', error);
+    }
+  }
+}
 
 // Initialize Database
 db.exec(`
@@ -111,7 +160,7 @@ admins.forEach(admin => {
 
 // Seed Admin if not exists
 const adminEmail = 'Soppysolch002@gmail.com';
-const adminPassword = 'Soppy2026';
+const adminPassword = 'Soppy2006';
 const hashedAdminPw = bcrypt.hashSync(adminPassword, 10);
 
 const adminExists = db.prepare('SELECT * FROM Users WHERE email = ?').get(adminEmail) as any;
@@ -141,18 +190,26 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // --- Auth Routes ---
-  app.post('/api/auth/register', (req, res) => {
+  app.post('/api/register', async (req, res) => {
     const { nom, prenom, email, whatsapp, mot_de_passe, ville, quartier, pays } = req.body;
     try {
       const hashedPw = bcrypt.hashSync(mot_de_passe, 10);
       const result = db.prepare('INSERT INTO Users (nom, prenom, email, whatsapp, mot_de_passe, ville, quartier, pays) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(nom, prenom, email, whatsapp, hashedPw, ville, quartier, pays);
-      res.status(201).json({ id: result.lastInsertRowid });
+      
+      // Send Welcome Email
+      await sendEmail(
+        email,
+        'Bienvenue chez SolchDisk Gaming !',
+        `<h1>Bienvenue ${prenom} !</h1><p>Merci de vous être inscrit sur SolchDisk Gaming. Votre compte est maintenant actif.</p>`
+      );
+
+      res.status(201).json({ id: result.lastInsertRowid, message: 'Inscription réussie !' });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }
   });
 
-  app.post('/api/auth/login', (req, res) => {
+  app.post('/api/login', async (req, res) => {
     const { email, mot_de_passe } = req.body;
     // email parameter can be either email or whatsapp number
     const user = db.prepare('SELECT * FROM Users WHERE email = ? OR whatsapp = ?').get(email, email) as any;
@@ -162,6 +219,14 @@ async function startServer() {
     }
 
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+    
+    // Optional: Send Login Notification Email
+    await sendEmail(
+      user.email,
+      'Nouvelle connexion détectée',
+      `<p>Bonjour ${user.prenom}, une nouvelle connexion à votre compte SolchDisk Gaming a été effectuée le ${new Date().toLocaleString()}.</p>`
+    );
+
     res.json({ 
       token, 
       user: { 
@@ -175,11 +240,12 @@ async function startServer() {
         quartier: user.quartier,
         pays: user.pays,
         photo_profil: user.photo_profil
-      } 
+      },
+      message: 'Connexion réussie !'
     });
   });
 
-  app.post('/api/auth/forgot-password', (req, res) => {
+  app.post('/api/forgot-password', async (req, res) => {
     const { email } = req.body;
     const user = db.prepare('SELECT * FROM Users WHERE email = ?').get(email) as any;
     
@@ -193,13 +259,18 @@ async function startServer() {
 
     db.prepare('INSERT INTO PasswordResets (email, token, expires_at) VALUES (?, ?, ?)').run(email, token, expiresAt);
 
-    // In a real app, send email here. For now, we'll just return it for the demo or log it.
-    console.log(`Password reset link for ${email}: http://localhost:3000/reset-password/${token}`);
+    // Send Reset Email
+    const resetLink = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password/${token}`;
+    await sendEmail(
+      email,
+      'Réinitialisation de votre mot de passe',
+      `<p>Vous avez demandé la réinitialisation de votre mot de passe. Cliquez sur le lien ci-dessous pour continuer :</p><a href="${resetLink}">${resetLink}</a><p>Ce lien expirera dans 1 heure.</p>`
+    );
     
     res.json({ message: 'Si cet email existe, un lien de réinitialisation a été envoyé.' });
   });
 
-  app.post('/api/auth/reset-password', (req, res) => {
+  app.post('/api/reset-password', (req, res) => {
     const { token, mot_de_passe } = req.body;
     const reset = db.prepare('SELECT * FROM PasswordResets WHERE token = ? AND expires_at > ?').get(token, new Date().toISOString()) as any;
 
@@ -213,6 +284,12 @@ async function startServer() {
 
     res.json({ success: true });
   });
+
+  // Keep old routes for backward compatibility or alias them
+  app.post('/api/auth/register', (req, res) => res.redirect(307, '/api/register'));
+  app.post('/api/auth/login', (req, res) => res.redirect(307, '/api/login'));
+  app.post('/api/auth/forgot-password', (req, res) => res.redirect(307, '/api/forgot-password'));
+  app.post('/api/auth/reset-password', (req, res) => res.redirect(307, '/api/reset-password'));
 
   // --- Games Routes ---
   app.get('/api/games', (req, res) => {

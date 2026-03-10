@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShoppingCart, 
   User as UserIcon, 
@@ -31,7 +31,9 @@ import {
   CheckCircle2,
   Facebook,
   Trophy,
-  MapPin
+  MapPin,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import axios from 'axios';
 import confetti from 'canvas-confetti';
@@ -82,6 +84,10 @@ const Navbar = () => {
   const location = useLocation();
 
   const updateCartCount = () => {
+    if (!isAuthenticated) {
+      setCartCount(0);
+      return;
+    }
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     setCartCount(cart.length);
   };
@@ -91,11 +97,11 @@ const Navbar = () => {
     
     window.addEventListener('storage', updateCartCount);
     return () => window.removeEventListener('storage', updateCartCount);
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     updateCartCount();
-  }, [location]);
+  }, [location, isAuthenticated]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-nav backdrop-blur-md border-b border-white/5">
@@ -135,7 +141,7 @@ const Navbar = () => {
                 </>
               )}
             </button>
-            {(!isAuthenticated || user?.role === 'client') && (
+            {isAuthenticated && user?.role === 'client' && (
               <Link to="/cart" className="p-2 hover:text-neon-green transition-colors relative text-primary">
                 <ShoppingCart className="w-5 h-5" />
                 {cartCount > 0 && (
@@ -189,7 +195,7 @@ const Navbar = () => {
             className="md:hidden bg-dark-card border-b border-white/5 px-4 pt-2 pb-6 space-y-4"
           >
             <Link to="/catalogue" className="block text-lg font-display uppercase text-primary" onClick={() => setIsMenuOpen(false)}>Catalogue</Link>
-            {(!isAuthenticated || user?.role === 'client') && (
+            {isAuthenticated && user?.role === 'client' && (
               <Link to="/cart" className="flex items-center justify-between text-lg font-display uppercase text-primary" onClick={() => setIsMenuOpen(false)}>
                 <span>Panier</span>
                 {cartCount > 0 && (
@@ -780,11 +786,12 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm();
 
   const onSubmit = async (data: any) => {
     try {
-      const res = await axios.post('/api/auth/login', data);
+      const res = await axios.post('/api/login', data);
       login(res.data.token, res.data.user);
       navigate(res.data.user.role === 'admin' ? '/admin' : '/profile');
     } catch (err: any) {
@@ -830,11 +837,20 @@ const Login = () => {
                 Mot de passe oublié ?
               </Link>
             </div>
-            <input 
-              {...register('mot_de_passe', { required: 'Mot de passe requis' })}
-              type="password" 
-              className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-green outline-none transition-all text-primary"
-            />
+            <div className="relative">
+              <input 
+                {...register('mot_de_passe', { required: 'Mot de passe requis' })}
+                type={showPassword ? "text" : "password"} 
+                className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-green outline-none transition-all text-primary pr-12"
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-neon-green transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {errors.mot_de_passe && <span className="text-neon-red text-[10px] uppercase mt-1">{errors.mot_de_passe.message as string}</span>}
           </div>
           <button type="submit" className="btn-neon btn-neon-green w-full py-4 mt-4">
@@ -857,7 +873,7 @@ const ForgotPassword = () => {
 
   const onSubmit = async (data: any) => {
     try {
-      const res = await axios.post('/api/auth/forgot-password', data);
+      const res = await axios.post('/api/forgot-password', data);
       setMessage(res.data.message);
       setError('');
     } catch (err: any) {
@@ -922,6 +938,7 @@ const ResetPassword = () => {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
 
   const onSubmit = async (data: any) => {
@@ -930,7 +947,7 @@ const ResetPassword = () => {
       return;
     }
     try {
-      await axios.post('/api/auth/reset-password', { token, mot_de_passe: data.mot_de_passe });
+      await axios.post('/api/reset-password', { token, mot_de_passe: data.mot_de_passe });
       setSuccess(true);
       setError('');
       setTimeout(() => navigate('/login'), 3000);
@@ -971,18 +988,27 @@ const ResetPassword = () => {
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div>
             <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Nouveau mot de passe</label>
-            <input 
-              {...register('mot_de_passe', { required: 'Mot de passe requis', minLength: { value: 6, message: 'Minimum 6 caractères' } })}
-              type="password" 
-              className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-green outline-none transition-all text-primary"
-            />
+            <div className="relative">
+              <input 
+                {...register('mot_de_passe', { required: 'Mot de passe requis', minLength: { value: 6, message: 'Minimum 6 caractères' } })}
+                type={showPassword ? "text" : "password"} 
+                className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-green outline-none transition-all text-primary pr-12"
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-neon-green transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {errors.mot_de_passe && <span className="text-neon-red text-[10px] uppercase mt-1">{errors.mot_de_passe.message as string}</span>}
           </div>
           <div>
             <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Confirmer le mot de passe</label>
             <input 
               {...register('confirm_password', { required: 'Confirmation requise' })}
-              type="password" 
+              type={showPassword ? "text" : "password"} 
               className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-green outline-none transition-all text-primary"
             />
             {errors.confirm_password && <span className="text-neon-red text-[10px] uppercase mt-1">{errors.confirm_password.message as string}</span>}
@@ -1000,6 +1026,7 @@ const Register = () => {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
 
   const onSubmit = async (data: any) => {
@@ -1009,7 +1036,7 @@ const Register = () => {
       return;
     }
     try {
-      await axios.post('/api/auth/register', rest);
+      await axios.post('/api/register', rest);
       setIsSuccess(true);
       setError('');
       
@@ -1093,12 +1120,29 @@ const Register = () => {
           </div>
           <div>
             <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Mot de passe</label>
-            <input {...register('mot_de_passe', { required: 'Mot de passe requis', minLength: { value: 6, message: '6 caractères minimum' } })} type="password" className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
+            <div className="relative">
+              <input 
+                {...register('mot_de_passe', { required: 'Mot de passe requis', minLength: { value: 6, message: '6 caractères minimum' } })} 
+                type={showPassword ? "text" : "password"} 
+                className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary pr-12" 
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-neon-blue transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {errors.mot_de_passe && <span className="text-neon-red text-[10px] uppercase mt-1">{errors.mot_de_passe.message as string}</span>}
           </div>
           <div>
             <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Confirmation</label>
-            <input {...register('confirm_password', { required: 'Confirmation requise' })} type="password" className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
+            <input 
+              {...register('confirm_password', { required: 'Confirmation requise' })} 
+              type={showPassword ? "text" : "password"} 
+              className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" 
+            />
             {errors.confirm_password && <span className="text-neon-red text-[10px] uppercase mt-1">{errors.confirm_password.message as string}</span>}
           </div>
           <div>
@@ -2125,12 +2169,14 @@ export default function App() {
   const login = (token: string, user: User) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
+    localStorage.removeItem('cart'); // Ensure fresh cart on login
     setAuthState({ token, user, isAuthenticated: true });
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('cart'); // Clear cart on logout
     setAuthState({ token: null, user: null, isAuthenticated: false });
   };
 
