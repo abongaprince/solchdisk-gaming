@@ -37,6 +37,7 @@ export interface Order {
   livraison_societe: 'Yango' | 'Waren' | 'Expédition' | 'Récupérer soi-même';
   statut: 'En attente' | 'En cours' | 'Livrée';
   preuve_paiement: string;
+  games_list?: string;
   date_commande: string;
   game_title?: string;
   game_image?: string;
