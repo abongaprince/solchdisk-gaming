@@ -15,16 +15,18 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Database connection pool
-const db = createPool({
-  host: (process.env.DB_HOST || '').trim(),
-  user: (process.env.DB_USER || '').trim(),
-  password: (process.env.DB_PASSWORD || '').trim(),
-  database: (process.env.DB_NAME || '').trim(),
-  port: parseInt((process.env.DB_PORT || '').trim() || '3306'),
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+const db = process.env.MYSQL_URL 
+  ? createPool(process.env.MYSQL_URL)
+  : createPool({
+      host: (process.env.DB_HOST || process.env.MYSQLHOST || 'localhost').trim(),
+      user: (process.env.DB_USER || process.env.MYSQLUSER || 'root').trim(),
+      password: (process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '').trim(),
+      database: (process.env.DB_NAME || process.env.MYSQLDATABASE || 'solchdisk_gaming').trim(),
+      port: parseInt((process.env.DB_PORT || process.env.MYSQLPORT || '3306').trim()),
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
+    });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'solchdisk-gaming-secret-key-2024';
 
@@ -75,16 +77,21 @@ async function sendEmail(to: string, subject: string, html: string) {
 
 // Initialize Database
 async function initDatabase() {
-  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD) {
+  const hasConfig = (process.env.DB_HOST || process.env.MYSQLHOST) && 
+                    (process.env.DB_USER || process.env.MYSQLUSER) && 
+                    (process.env.DB_PASSWORD || process.env.MYSQLPASSWORD);
+
+  if (!hasConfig) {
     console.error('CRITICAL: Database environment variables are missing!');
-    console.error('Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in the Settings menu.');
+    console.error('Please set DB_HOST, DB_USER, DB_PASSWORD (or use Railway MySQL variables) in the Settings menu.');
     return;
   }
 
   try {
     // Test connection
+    console.log('Attempting to connect to database...');
     const connection = await db.getConnection();
-    console.log('Successfully connected to the database.');
+    console.log('✅ Successfully connected to the database.');
     connection.release();
 
     await db.execute(`
