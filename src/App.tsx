@@ -171,15 +171,15 @@ const Navbar = () => {
           </div>
 
           {/* Mobile Menu Toggle */}
-          <div className="md:hidden flex items-center gap-2">
+          <div className="md:hidden flex items-center gap-4">
             <button 
               onClick={toggleTheme}
-              className="p-2 hover:text-neon-green transition-colors"
+              className="p-2 hover:text-neon-green transition-colors text-primary"
             >
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2">
-              {isMenuOpen ? <X /> : <Menu />}
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-primary">
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
@@ -189,77 +189,41 @@ const Navbar = () => {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden bg-dark-card border-b border-white/5 px-4 pt-2 pb-6 space-y-4"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden bg-dark-card border-b border-white/5 overflow-hidden"
           >
-            <Link to="/catalogue" className="block text-lg font-display uppercase text-primary" onClick={() => setIsMenuOpen(false)}>Catalogue</Link>
-            {isAuthenticated && user?.role === 'client' && (
-              <Link to="/cart" className="flex items-center justify-between text-lg font-display uppercase text-primary" onClick={() => setIsMenuOpen(false)}>
-                <span>Panier</span>
-                {cartCount > 0 && (
-                  <span className="bg-neon-green text-black text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-[0_0_10px_#39FF14]">
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
-            )}
-            {isAuthenticated ? (
-              <>
-                <Link to={user?.role === 'admin' ? "/admin" : "/profile"} className="flex items-center gap-3 text-lg font-display uppercase text-primary" onClick={() => setIsMenuOpen(false)}>
-                  {user?.photo_profil ? (
-                    <img src={user.photo_profil} className="w-8 h-8 rounded-full object-cover border border-neon-green/30" />
-                  ) : (
-                    <UserIcon className="w-6 h-6" />
+            <div className="px-4 pt-2 pb-8 space-y-4">
+              <Link to="/catalogue" className="block py-2 text-lg font-display uppercase text-primary border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Catalogue</Link>
+              <Link to="/about" className="block py-2 text-lg font-display uppercase text-primary border-b border-white/5" onClick={() => setIsMenuOpen(false)}>À Propos</Link>
+              <Link to="/contact" className="block py-2 text-lg font-display uppercase text-primary border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Contact</Link>
+              {isAuthenticated && user?.role === 'client' && (
+                <Link to="/cart" className="flex items-center justify-between py-2 text-lg font-display uppercase text-primary border-b border-white/5" onClick={() => setIsMenuOpen(false)}>
+                  <span>Panier</span>
+                  {cartCount > 0 && (
+                    <span className="bg-neon-green text-black text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-[0_0_10px_#39FF14]">
+                      {cartCount}
+                    </span>
                   )}
-                  <span>Profil</span>
                 </Link>
-                <div className="flex items-center justify-between pt-4 border-t border-white/5">
-              <span className="text-sm font-display uppercase tracking-widest text-muted">Thème</span>
-              <button 
-                onClick={toggleTheme}
-                className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 text-primary"
-              >
-                {theme === 'dark' ? (
-                  <>
-                    <Sun className="w-4 h-4 text-neon-green" />
-                    <span className="text-xs uppercase tracking-widest font-bold">Clair</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-4 h-4 text-neon-green" />
-                    <span className="text-xs uppercase tracking-widest font-bold">Sombre</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <button onClick={logout} className="block text-lg font-display uppercase text-neon-red w-full text-left">Déconnexion</button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="block text-lg font-display uppercase text-neon-green" onClick={() => setIsMenuOpen(false)}>Connexion</Link>
-                <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                  <span className="text-sm font-display uppercase tracking-widest text-muted">Thème</span>
-                  <button 
-                    onClick={toggleTheme}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 text-primary"
-                  >
-                    {theme === 'dark' ? (
-                      <>
-                        <Sun className="w-4 h-4 text-neon-green" />
-                        <span className="text-xs uppercase tracking-widest font-bold">Clair</span>
-                      </>
+              )}
+              {isAuthenticated ? (
+                <>
+                  <Link to={user?.role === 'admin' ? "/admin" : "/profile"} className="flex items-center gap-3 py-2 text-lg font-display uppercase text-primary border-b border-white/5" onClick={() => setIsMenuOpen(false)}>
+                    {user?.photo_profil ? (
+                      <img src={user.photo_profil} className="w-8 h-8 rounded-full object-cover border border-neon-green/30" />
                     ) : (
-                      <>
-                        <Moon className="w-4 h-4 text-neon-green" />
-                        <span className="text-xs uppercase tracking-widest font-bold">Sombre</span>
-                      </>
+                      <UserIcon className="w-6 h-6" />
                     )}
-                  </button>
-                </div>
-              </>
-            )}
+                    <span>Profil</span>
+                  </Link>
+                  <button onClick={() => { logout(); setIsMenuOpen(false); }} className="block py-2 text-lg font-display uppercase text-neon-red w-full text-left">Déconnexion</button>
+                </>
+              ) : (
+                <Link to="/login" className="block py-4 text-center text-lg font-display uppercase bg-neon-green text-black font-bold rounded-sm mt-4" onClick={() => setIsMenuOpen(false)}>Connexion</Link>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -332,7 +296,7 @@ const Home = () => {
             transition={{ duration: 0.8 }}
             className="max-w-3xl"
           >
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-6 leading-tight text-primary uppercase">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-8xl font-black mb-6 leading-tight text-primary uppercase">
               Le gaming, <span className="text-neon-green">sans compromis.</span>
             </h1>
             <p className="text-lg md:text-xl text-secondary mb-10 leading-relaxed max-w-2xl">
@@ -1219,11 +1183,16 @@ const Cart = () => {
 
     try {
       // Create a single order for the whole pack/service
+      const gamesList = items.some((item: any) => item.isPack) 
+        ? JSON.stringify(items.find((item: any) => item.isPack).games.map((g: any) => g.titre))
+        : null;
+
       await axios.post('/api/orders', {
         game_id: items[0]?.isPack ? null : items[0]?.id,
         disque_dur_option: serviceOption,
         livraison_societe,
         preuve_paiement: proofPreview,
+        games_list: gamesList
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -1549,6 +1518,7 @@ const Profile = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchOrders();
+      alert('Votre commande a été annulée. Le remboursement sera effectué dans un délai de 3 jours.');
     } catch (err: any) {
       alert(err.response?.data?.error || 'Erreur lors de l\'annulation');
     }
@@ -1708,6 +1678,15 @@ const Profile = () => {
                   <img src={order.game_image || 'https://picsum.photos/seed/pack/800/600'} className="w-20 h-20 object-cover rounded-sm" />
                   <div className="flex-1">
                     <h4 className="font-bold uppercase tracking-wider">{order.game_title || (order.disque_dur_option === 'fourni' ? 'Pack SolchDisk' : 'Installation Seule')}</h4>
+                    {order.games_list && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {JSON.parse(order.games_list).map((gameTitle: string, idx: number) => (
+                          <span key={idx} className="text-[8px] bg-white/5 px-2 py-0.5 rounded-full border border-white/5 text-muted">
+                            {gameTitle}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <p className="text-xs text-muted mt-1">Commandé le {new Date(order.date_commande).toLocaleDateString()}</p>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-[10px] uppercase text-muted">Preuve:</span>
@@ -1727,6 +1706,7 @@ const Profile = () => {
                       "px-4 py-1 rounded-full text-[10px] font-display uppercase tracking-widest border",
                       order.statut === 'En attente' ? "bg-neon-red/10 border-neon-red/30 text-neon-red" :
                       order.statut === 'En cours' ? "bg-neon-blue/10 border-neon-blue/30 text-neon-blue" :
+                      order.statut === 'Annulée' ? "bg-white/5 border-white/20 text-muted" :
                       "bg-neon-green/10 border-neon-green/30 text-neon-green"
                     )}>
                       {order.statut}
@@ -1880,6 +1860,15 @@ const AdminDashboard = () => {
                   </td>
                   <td className="py-6 px-4">
                     <p className="text-sm text-neon-blue uppercase font-bold">{order.game_title || (order.disque_dur_option === 'fourni' ? 'Pack SolchDisk' : 'Installation Seule')}</p>
+                    {order.games_list && (
+                      <div className="mt-2 flex flex-wrap gap-1 max-w-[200px]">
+                        {JSON.parse(order.games_list).map((gameTitle: string, idx: number) => (
+                          <span key={idx} className="text-[8px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 text-muted">
+                            {gameTitle}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       <span className="text-[9px] px-2 py-0.5 bg-white/5 border border-white/10 text-muted uppercase">
                         Disque: {order.disque_dur_option === 'fourni' ? 'Fourni' : 'Client'}
@@ -1908,6 +1897,7 @@ const AdminDashboard = () => {
                       "px-3 py-1 rounded-sm text-[9px] font-display uppercase tracking-widest border",
                       order.statut === 'En attente' ? "border-neon-red text-neon-red" :
                       order.statut === 'En cours' ? "border-neon-blue text-neon-blue" :
+                      order.statut === 'Annulée' ? "border-white/20 text-muted" :
                       "border-neon-green text-neon-green"
                     )}>
                       {order.statut}
@@ -1922,6 +1912,7 @@ const AdminDashboard = () => {
                       <option value="En attente">En attente</option>
                       <option value="En cours">En cours</option>
                       <option value="Livrée">Livrée</option>
+                      <option value="Annulée">Annulée</option>
                     </select>
                   </td>
                 </tr>
@@ -2203,84 +2194,103 @@ export default function App() {
                   <Route path="/profile" element={isAuthenticated ? <Profile /> : <Login />} />
                   <Route path="/admin" element={isAuthenticated && user?.role === 'admin' ? <AdminDashboard /> : <Login />} />
                   <Route path="/about" element={
-                    <div className="pt-40 max-w-4xl mx-auto px-4 text-center">
-                      <h2 className="text-4xl font-black uppercase mb-8">À Propos de <span className="text-neon-green">SolchDisk Gaming</span></h2>
-                      <div className="space-y-6 text-secondary leading-relaxed text-lg">
-                        <p>
-                          SolchDisk Gaming est né de la passion pour le gaming pur et immersif. Nous croyons que chaque joueur mérite une expérience fluide et complète, de l’achat à l’installation des jeux.
-                        </p>
-                        <p>
-                          Basés en Côte d’Ivoire, nous nous engageons à faciliter l’accès aux derniers titres PC grâce à des solutions simples et sécurisées. Que vous choisissiez nos disques durs gaming préchargés ou l’installation sur votre propre disque, notre objectif est de vous offrir une expérience gaming optimale dès le premier instant.
-                        </p>
-                        <p>
-                          Nous utilisons des méthodes de paiement locales, telles que MTN Mobile Money, Moov Money et Wave, pour rendre les transactions rapides et sûres. Notre service logistique, en partenariat avec des sociétés fiables comme Yango et Waren, garantit une livraison efficace dans toute la sous-région : Ghana, Mali, Burkina Faso, Sénégal, Bénin et Togo.
-                        </p>
-                        <p>
-                          Chez SolchDisk Gaming, nous ne vendons pas seulement des jeux : nous offrons la tranquillité d’esprit, la qualité et le plaisir de jouer, tout en restant proches de notre communauté de gamers et en répondant à leurs besoins avec passion et professionnalisme.
-                        </p>
-                      </div>
+                    <div className="pt-28 md:pt-40 max-w-4xl mx-auto px-6 text-center pb-20">
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <h2 className="text-3xl md:text-5xl font-black uppercase mb-8 leading-tight">À Propos de <span className="text-neon-green">SolchDisk Gaming</span></h2>
+                        <div className="space-y-8 text-secondary leading-relaxed text-sm md:text-lg text-justify md:text-center">
+                          <p>
+                            SolchDisk Gaming est né de la passion pour le gaming pur et immersif. Nous croyons que chaque joueur mérite une expérience fluide et complète, de l’achat à l’installation des jeux.
+                          </p>
+                          <p>
+                            Basés en Côte d’Ivoire, nous nous engageons à faciliter l’accès aux derniers titres PC grâce à des solutions simples et sécurisées. Que vous choisissiez nos disques durs gaming préchargés ou l’installation sur votre propre disque, notre objectif est de vous offrir une expérience gaming optimale dès le premier instant.
+                          </p>
+                          <p>
+                            Nous utilisons des méthodes de paiement locales, telles que MTN Mobile Money, Moov Money et Wave, pour rendre les transactions rapides et sûres. Notre service logistique, en partenariat avec des sociétés fiables comme Yango et Waren, garantit une livraison efficace dans toute la sous-région : Ghana, Mali, Burkina Faso, Sénégal, Bénin et Togo.
+                          </p>
+                          <p>
+                            Chez SolchDisk Gaming, nous ne vendons pas seulement des jeux : nous offrons la tranquillité d’esprit, la qualité et le plaisir de jouer, tout en restant proches de notre communauté de gamers et en répondant à leurs besoins avec passion et professionnalisme.
+                          </p>
+                          
+                          <div className="pt-10 border-t border-white/10">
+                            <h3 className="text-xl font-bold uppercase text-neon-red mb-4">Politique de Remboursement</h3>
+                            <p className="text-xs md:text-sm text-muted italic">
+                              En cas d'annulation d'une commande en attente, le remboursement est traité dans un délai de 3 jours ouvrables. Notre équipe s'engage à traiter chaque demande avec le plus grand soin.
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
                     </div>
                   } />
                   <Route path="/contact" element={
-                    <div className="pt-40 max-w-5xl mx-auto px-4">
-                      <h2 className="text-4xl font-black uppercase mb-12 text-center">Contactez <span className="text-neon-blue">L'Équipe</span></h2>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                        <div className="lg:col-span-1 space-y-8">
-                          <div className="bg-dark-card p-8 border border-white/5 rounded-sm hover:border-neon-blue transition-all group">
-                            <a href="mailto:Soppysolch002@gmail.com" className="block">
-                              <Mail className="w-8 h-8 text-neon-blue mb-4 group-hover:scale-110 transition-transform" />
-                              <h4 className="font-bold uppercase mb-2">Email</h4>
-                              <p className="text-muted text-sm hover:text-neon-blue transition-colors">Soppysolch002@gmail.com</p>
-                            </a>
+                    <div className="pt-28 md:pt-40 max-w-6xl mx-auto px-6 pb-20">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        <h2 className="text-3xl md:text-5xl font-black uppercase mb-12 text-center">Contactez <span className="text-neon-blue">L'Équipe</span></h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
+                          <div className="lg:col-span-1 space-y-6 md:space-y-8">
+                            <div className="bg-dark-card p-6 md:p-8 border border-white/5 rounded-sm hover:border-neon-blue transition-all group">
+                              <a href="mailto:Soppysolch002@gmail.com" className="block">
+                                <Mail className="w-8 h-8 text-neon-blue mb-4 group-hover:scale-110 transition-transform" />
+                                <h4 className="font-bold uppercase mb-2">Email</h4>
+                                <p className="text-muted text-xs md:text-sm hover:text-neon-blue transition-colors break-all">Soppysolch002@gmail.com</p>
+                              </a>
+                            </div>
+                            <div className="bg-dark-card p-6 md:p-8 border border-white/5 rounded-sm hover:border-neon-green transition-all group">
+                              <a href="https://wa.me/2250143407801" target="_blank" rel="noopener noreferrer" className="block">
+                                <Info className="w-8 h-8 text-neon-green mb-4 group-hover:scale-110 transition-transform" />
+                                <h4 className="font-bold uppercase mb-2">Support</h4>
+                                <p className="text-muted text-xs italic mb-1">Disponible 24/7 via WhatsApp</p>
+                                <p className="text-muted text-xs md:text-sm hover:text-neon-green transition-colors">Whatsapp : +225 01 43 40 78 01</p>
+                              </a>
+                            </div>
+                            <div className="bg-dark-card p-6 md:p-8 border border-white/5 rounded-sm hover:border-neon-red transition-all group">
+                              <a href="https://www.google.com/maps/place/5%C2%B020'19.4%22N+4%C2%B006'49.6%22W/@5.3387243,-4.1163603,654m/data=!3m2!1e3!4b1!4m4!3m3!8m2!3d5.3387243!4d-4.1137854?hl=fr&entry=ttu&g_ep=EgoyMDI2MDIyNS4wIKXMDSoASAFQAw%3D%3D" target="_blank" rel="noopener noreferrer" className="block">
+                                <MapPin className="w-8 h-8 text-neon-red mb-4 group-hover:scale-110 transition-transform" />
+                                <h4 className="font-bold uppercase mb-2">Localisation</h4>
+                                <p className="text-muted text-xs italic mb-1">Abidjan, Côte d'Ivoire</p>
+                                <p className="text-muted text-xs md:text-sm hover:text-neon-red transition-colors">Voir sur Google Maps</p>
+                              </a>
+                            </div>
                           </div>
-                          <div className="bg-dark-card p-8 border border-white/5 rounded-sm hover:border-neon-green transition-all group">
-                            <a href="https://wa.me/2250143407801" target="_blank" rel="noopener noreferrer" className="block">
-                              <Info className="w-8 h-8 text-neon-green mb-4 group-hover:scale-110 transition-transform" />
-                              <h4 className="font-bold uppercase mb-2">Support</h4>
-                              <p className="text-muted text-sm italic mb-1">Disponible 24/7 via WhatsApp</p>
-                              <p className="text-muted text-sm hover:text-neon-green transition-colors">Whatsapp : +225 01 43 40 78 01</p>
-                            </a>
-                          </div>
-                          <div className="bg-dark-card p-8 border border-white/5 rounded-sm hover:border-neon-red transition-all group">
-                            <a href="https://www.google.com/maps/place/5%C2%B020'19.4%22N+4%C2%B006'49.6%22W/@5.3387243,-4.1163603,654m/data=!3m2!1e3!4b1!4m4!3m3!8m2!3d5.3387243!4d-4.1137854?hl=fr&entry=ttu&g_ep=EgoyMDI2MDIyNS4wIKXMDSoASAFQAw%3D%3D" target="_blank" rel="noopener noreferrer" className="block">
-                              <MapPin className="w-8 h-8 text-neon-red mb-4 group-hover:scale-110 transition-transform" />
-                              <h4 className="font-bold uppercase mb-2">Localisation</h4>
-                              <p className="text-muted text-sm italic mb-1">Abidjan, Côte d'Ivoire</p>
-                              <p className="text-muted text-sm hover:text-neon-red transition-colors">Voir sur Google Maps</p>
-                            </a>
-                          </div>
-                        </div>
-                        
-                        <div className="lg:col-span-2">
-                          <form 
-                            action="https://formspree.io/f/xlgpgyzb"
-                            method="POST"
-                            className="bg-dark-card p-10 border border-white/10 rounded-sm space-y-6"
-                          >
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div>
-                                <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Nom</label>
-                                <input name="name" required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
+                          
+                          <div className="lg:col-span-2">
+                            <form 
+                              action="https://formspree.io/f/xlgpgyzb"
+                              method="POST"
+                              className="bg-dark-card p-6 md:p-10 border border-white/10 rounded-sm space-y-6"
+                            >
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                  <label className="block text-[10px] font-display uppercase tracking-widest text-muted mb-2">Nom</label>
+                                  <input name="name" required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-display uppercase tracking-widest text-muted mb-2">Email</label>
+                                  <input name="email" type="email" required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
+                                </div>
                               </div>
                               <div>
-                                <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Email</label>
-                                <input name="email" type="email" required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
+                                <label className="block text-[10px] font-display uppercase tracking-widest text-muted mb-2">Sujet</label>
+                                <input name="subject" required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
                               </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Sujet</label>
-                              <input name="subject" required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all text-primary" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-display uppercase tracking-widest text-muted mb-2">Message</label>
-                              <textarea name="message" rows={5} required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all resize-none text-primary"></textarea>
-                            </div>
-                            <button type="submit" className="btn-neon bg-neon-blue text-black hover:bg-white hover:shadow-[0_0_20px_#00F0FF] py-4 w-full">
-                              Envoyer le Message
-                            </button>
-                          </form>
+                              <div>
+                                <label className="block text-[10px] font-display uppercase tracking-widest text-muted mb-2">Message</label>
+                                <textarea name="message" rows={5} required className="w-full bg-input border border-white/10 rounded-sm py-3 px-4 focus:border-neon-blue outline-none transition-all resize-none text-primary"></textarea>
+                              </div>
+                              <button type="submit" className="btn-neon bg-neon-blue text-black hover:bg-white hover:shadow-[0_0_20px_#00F0FF] py-4 w-full font-bold">
+                                Envoyer le Message
+                              </button>
+                            </form>
+                          </div>
                         </div>
-                      </div>
+                      </motion.div>
                     </div>
                   } />
                 </Routes>

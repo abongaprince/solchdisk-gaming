@@ -35,8 +35,9 @@ export interface Order {
   game_id: number | null;
   disque_dur_option: 'client' | 'fourni';
   livraison_societe: 'Yango' | 'Waren' | 'Expédition' | 'Récupérer soi-même';
-  statut: 'En attente' | 'En cours' | 'Livrée';
+  statut: 'En attente' | 'En cours' | 'Livrée' | 'Annulée';
   preuve_paiement: string;
+  games_list?: string;
   date_commande: string;
   game_title?: string;
   game_image?: string;
