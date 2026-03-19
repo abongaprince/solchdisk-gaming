@@ -65,52 +65,62 @@ async function startServer() {
   });
 
   // --- AUTH : CONNEXION (SOLUTIONS ANTI-ÉCRAN NOIR) ---
-  app.post('/api/login', async (req, res) => {
-    const { email, mot_de_passe } = req.body;
-    try {
-      const [rows]: any = await db.execute('SELECT * FROM Users WHERE email = ? OR whatsapp = ?', [email, email]);
-      
-      // 1. Vérifier si l'utilisateur existe
-      if (!rows || rows.length === 0) {
-        return res.status(401).json({ error: 'Identifiants invalides' });
-      }
+ app.post('/api/login', async (req, res) => {
+  const { email, mot_de_passe } = req.body;
+  try {
+    // On nettoie l'email des espaces superflus avec .trim()
+    const cleanEmail = email.trim();
 
-      const user = rows;
-
-      // 2. Gérer le type BLOB de Railway pour le mot de passe
-      const storedHash = user.mot_de_passe.toString();
-
-      // 3. Comparaison Bcrypt
-      if (!bcrypt.compareSync(mot_de_passe, storedHash)) {
-        return res.status(401).json({ error: 'Identifiants invalides' });
-      }
-
-      // 4. Génération du Token
-      const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      // 5. Envoyer un objet utilisateur PROPRE (sans le mot de passe)
-      // On s'assure que les champs ne sont pas undefined pour éviter le crash React
-      const userResponse = {
-        id: user.id,
-        nom: user.nom || '',
-        prenom: user.prenom || '',
-        email: user.email,
-        role: user.role || 'client',
-        whatsapp: user.whatsapp || '',
-        photo_profil: user.photo_profil || null
-      };
-
-      res.json({ token, user: userResponse });
-    } catch (e: any) {
-      console.error("Login Error:", e);
-      res.status(500).json({ error: "Erreur serveur" });
+    const [rows]: any = await db.execute(
+      'SELECT * FROM Users WHERE email = ? OR whatsapp = ?', 
+      [cleanEmail, cleanEmail]
+    );
+    
+    if (!rows || rows.length === 0) {
+      return res.status(401).json({ error: 'Compte introuvable' });
     }
-  });
 
+    const user = rows;
+
+    // Conversion BLOB -> String (Obligatoire sur Railway)
+    const storedHash = user.mot_de_passe ? user.mot_de_passe.toString() : "";
+
+    // Comparaison flexible (Hash ou Texte brut)
+    let isMatch = false;
+    if (storedHash.startsWith('$2')) {
+      isMatch = bcrypt.compareSync(mot_de_passe, storedHash);
+    } else {
+      isMatch = (mot_de_passe === storedHash); // Secours si le SQL n'est pas passé
+    }
+    
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Mot de passe incorrect' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role }, 
+      JWT_SECRET, 
+      { expiresIn: '24h' }
+    );
+
+    // STRUCTURE ANTI-CRASH : On garantit que React reçoit des chaînes, pas du null
+    const safeUser = {
+      id: Number(user.id),
+      nom: user.nom || "Utilisateur",
+      prenom: user.prenom || "",
+      email: user.email,
+      whatsapp: user.whatsapp || "",
+      role: user.role || 'client',
+      photo_profil: user.photo_profil || ""
+    };
+
+    res.json({ token, user: safeUser });
+
+  } catch (e: any) {
+    console.error("Erreur Login:", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
   // --- ADMIN : STATS (L'AUTRE CAUSE DE L'ÉCRAN NOIR) ---
   app.get('/api/admin/stats', authMiddleware, async (req: any, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Interdit' });
