@@ -4,7 +4,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -13,7 +12,7 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 1. CONFIGURATION BDD
+// 1. CONFIGURATION BDD (Optimisée pour Railway)
 const dbConfig = process.env.MYSQL_URL || {
   host: (process.env.DB_HOST || process.env.MYSQLHOST || 'localhost').trim(),
   user: (process.env.DB_USER || process.env.MYSQLUSER || 'root').trim(),
@@ -28,14 +27,14 @@ const dbConfig = process.env.MYSQL_URL || {
 const db = createPool(dbConfig);
 const JWT_SECRET = process.env.JWT_SECRET || 'solchdisk-gaming-secret-key-2024';
 
-// 2. INITIALISATION DES TABLES ET DE L'ADMIN
+// 2. INITIALISATION DES TABLES (Structure complète pour App.tsx)
 async function initDatabase() {
   try {
     const connection = await db.getConnection();
-    console.log('✅ Base de données connectée.');
+    console.log('✅ Base de données connectée avec succès.');
     connection.release();
 
-    // Table Utilisateurs
+    // Table Users
     await db.execute(`
       CREATE TABLE IF NOT EXISTS Users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -46,7 +45,7 @@ async function initDatabase() {
       )
     `);
 
-    // Table Jeux
+    // Table Games (avec specs techniques)
     await db.execute(`
       CREATE TABLE IF NOT EXISTS Games (
         id INT AUTO_INCREMENT PRIMARY KEY, titre VARCHAR(255), description TEXT,
@@ -56,36 +55,37 @@ async function initDatabase() {
       )
     `);
 
-    // Table Commandes
+    // Table Orders (avec gestion panier multi-jeux)
     await db.execute(`
       CREATE TABLE IF NOT EXISTS Orders (
-        id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, game_id INT,
-        disque_dur_option VARCHAR(100), livraison_societe VARCHAR(100),
-        statut VARCHAR(50) DEFAULT 'En attente', preuve_paiement LONGTEXT,
-        games_list TEXT, date_commande TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, 
+        games_list TEXT, total_price INT, statut VARCHAR(50) DEFAULT 'En attente', 
+        preuve_paiement LONGTEXT, date_commande TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
       )
     `);
 
-    // --- SEED ADMIN ---
+    // SEED ADMIN
     const adminEmail = 'Soppysolch002@gmail.com';
     const [rows]: any = await db.execute('SELECT id FROM Users WHERE email = ?', [adminEmail]);
-    if (!rows || rows.length === 0) {
-      const hashedAdminPw = bcrypt.hashSync('Soppy2006', 10);
+    if (rows.length === 0) {
+      const hashedPw = bcrypt.hashSync('Soppy2006', 10);
       await db.execute(
         'INSERT INTO Users (nom, prenom, email, mot_de_passe, role, whatsapp) VALUES (?, ?, ?, ?, ?, ?)',
-        ['Admin', 'SolchDisk', adminEmail, hashedAdminPw, 'admin', '00000000']
+        ['Admin', 'SolchDisk', adminEmail, hashedPw, 'admin', '00000000']
       );
-      console.log("✅ Admin créé.");
+      console.log("✅ Compte Admin créé.");
     }
   } catch (error) {
-    console.error('❌ Erreur Initialisation:', error.message);
+    console.error('❌ Erreur Initialisation BDD:', error);
   }
 }
 
 // 3. LOGIQUE DU SERVEUR
 async function startServer() {
   const app = express();
+  
+  // Sécurité et Performance
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(compression());
   app.use(express.json({ limit: '50mb' }));
@@ -93,35 +93,34 @@ async function startServer() {
 
   await initDatabase();
 
-  // --- MIDDLEWARES ---
-  const authMiddleware = (req: any, res: any, next: any) => {
-    const token = req.headers.authorization?.split(' ');
-    if (!token) return res.status(401).json({ error: 'Non autorisé' });
-    try {
-      req.user = jwt.verify(token, JWT_SECRET);
+  // --- MIDDLEWARES AUTH ---
+  const authenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ');
+    if (!token) return res.status(401).json({ error: 'Token manquant' });
+
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+      if (err) return res.status(403).json({ error: 'Session expirée' });
+      req.user = user;
       next();
-    } catch (e) { res.status(401).json({ error: 'Token invalide' }); }
+    });
   };
 
-  const isAdmin = (req: any, res: any, next: any) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès admin requis' });
-    next();
-  };
-
-  // --- ROUTES AUTH ---
+  // --- ROUTES AUTHENTIFICATION ---
   app.post('/api/login', async (req, res) => {
     const { email, mot_de_passe } = req.body;
     try {
       const [rows]: any = await db.execute('SELECT * FROM Users WHERE email = ? OR whatsapp = ?', [email, email]);
-      const user = rows; // CRUCIAL : Correction ici
+      const user = rows;
 
       if (!user || !bcrypt.compareSync(mot_de_passe, user.mot_de_passe)) {
-        return res.status(401).json({ error: 'Identifiants invalides' });
+        return res.status(401).json({ error: 'Identifiants incorrects' });
       }
 
       const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-      res.json({ token, user: { ...user, mot_de_passe: undefined } });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+      const { mot_de_passe: _, ...userSafe } = user;
+      res.json({ token, user: userSafe });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.post('/api/register', async (req, res) => {
@@ -132,55 +131,107 @@ async function startServer() {
         'INSERT INTO Users (nom, prenom, email, whatsapp, mot_de_passe, ville, quartier, pays) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [nom, prenom, email, whatsapp, hashedPw, ville, quartier, pays]
       );
-      res.status(201).json({ message: 'Succès' });
-    } catch (e) { res.status(400).json({ error: e.message }); }
+      res.status(201).json({ success: true });
+    } catch (e: any) { res.status(400).json({ error: "Email ou WhatsApp déjà utilisé" }); }
+  });
+
+  // --- ROUTES PROFIL (Pour éviter l'écran noir au chargement du dashboard) ---
+  app.get('/api/me', authenticateToken, async (req: any, res) => {
+    const [rows]: any = await db.execute('SELECT * FROM Users WHERE id = ?', [req.user.id]);
+    if (rows) {
+      const { mot_de_passe: _, ...userSafe } = rows;
+      res.json(userSafe);
+    } else { res.status(404).json({ error: 'Utilisateur non trouvé' }); }
+  });
+
+  app.put('/api/users/profile', authenticateToken, async (req: any, res) => {
+    const { nom, prenom, whatsapp, photo_profil } = req.body;
+    try {
+      await db.execute(
+        'UPDATE Users SET nom = ?, prenom = ?, whatsapp = ?, photo_profil = ? WHERE id = ?',
+        [nom, prenom, whatsapp, photo_profil, req.user.id]
+      );
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // --- ROUTES JEUX ---
   app.get('/api/games', async (req, res) => {
-    const [games] = await db.query('SELECT * FROM Games ORDER BY date_ajout DESC');
-    res.json(games);
+    try {
+      const [games] = await db.query('SELECT * FROM Games ORDER BY date_ajout DESC');
+      res.json(games);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post('/api/games', authMiddleware, isAdmin, async (req, res) => {
-    const { titre, prix, description, image } = req.body;
-    await db.execute('INSERT INTO Games (titre, prix, description, image) VALUES (?, ?, ?, ?)', [titre, prix, description, image]);
-    res.status(201).json({ success: true });
+  app.post('/api/games', authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Interdit' });
+    const { titre, prix, description, image, cpu, gpu, ram, storage, os, directx } = req.body;
+    try {
+      await db.execute(
+        'INSERT INTO Games (titre, prix, description, image, cpu, gpu, ram, storage, os, directx) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [titre, prix, description, image, cpu, gpu, ram, storage, os, directx]
+      );
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/games/:id', authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Interdit' });
+    await db.execute('DELETE FROM Games WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
   });
 
   // --- ROUTES COMMANDES ---
-  app.post('/api/orders', authMiddleware, async (req: any, res) => {
-    const { game_id, disque_dur_option, livraison_societe, preuve_paiement } = req.body;
-    await db.execute(
-      'INSERT INTO Orders (user_id, game_id, disque_dur_option, livraison_societe, preuve_paiement) VALUES (?, ?, ?, ?, ?)',
-      [req.user.id, game_id, disque_dur_option, livraison_societe, preuve_paiement]
-    );
-    res.status(201).json({ success: true });
+  app.post('/api/orders', authenticateToken, async (req: any, res) => {
+    const { games_list, total_price, preuve_paiement } = req.body;
+    try {
+      await db.execute(
+        'INSERT INTO Orders (user_id, games_list, total_price, preuve_paiement) VALUES (?, ?, ?, ?)',
+        [req.user.id, JSON.stringify(games_list), total_price, preuve_paiement]
+      );
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/admin/orders', authMiddleware, isAdmin, async (req, res) => {
-    const [orders]: any = await db.query(`
-      SELECT o.*, u.nom as user_nom, g.titre as game_title 
+  app.get('/api/my-orders', authenticateToken, async (req: any, res) => {
+    const [orders] = await db.execute('SELECT * FROM Orders WHERE user_id = ? ORDER BY date_commande DESC', [req.user.id]);
+    res.json(orders);
+  });
+
+  // --- ADMIN : TOUTES LES COMMANDES ---
+  app.get('/api/admin/orders', authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Interdit' });
+    const [orders] = await db.query(`
+      SELECT o.*, u.nom, u.prenom, u.email 
       FROM Orders o 
       JOIN Users u ON o.user_id = u.id 
-      LEFT JOIN Games g ON o.game_id = g.id
+      ORDER BY o.date_commande DESC
     `);
     res.json(orders);
   });
 
-  // --- FRONTEND ---
+  app.patch('/api/admin/orders/:id', authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Interdit' });
+    const { statut } = req.body;
+    await db.execute('UPDATE Orders SET statut = ? WHERE id = ?', [statut, req.params.id]);
+    res.json({ success: true });
+  });
+
+  // --- GESTION DU FRONTEND (Dossier dist) ---
   const distPath = path.resolve(process.cwd(), 'dist');
   app.use(express.static(distPath));
+
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'), (err) => {
-      if (err) res.status(404).send("Frontend introuvable.");
+      if (err) res.status(404).send("Frontend non compilé. Lancez 'npm run build'.");
     });
   });
 
+  // --- LANCEMENT ---
   const PORT = process.env.PORT || 8080;
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SERVEUR PRÊT SUR LE PORT ${PORT}`);
+    console.log(`🚀 SERVEUR SOLCHDISK PRÊT SUR LE PORT ${PORT}`);
   });
 }
 
-startServer().catch(err => console.error(err));
+startServer().catch(err => console.error("FATAL ERROR:", err));
