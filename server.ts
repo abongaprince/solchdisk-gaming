@@ -165,10 +165,9 @@ async function initDatabase() {
       )
     `);
 
-    // Seed Admin if not exists
     const adminEmail = 'Soppysolch002@gmail.com';
-    const adminPassword = 'Soppy2006';
-    const hashedAdminPw = bcrypt.hashSync(adminPassword, 10);
+const adminPassword = 'Soppy2006';
+const hashedAdminPw = bcrypt.hashSync(adminPassword, 10);
 
     const [adminRows]: any = await db.execute('SELECT * FROM Users WHERE email = ?', [adminEmail]);
 
