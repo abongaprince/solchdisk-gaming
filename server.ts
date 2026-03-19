@@ -169,7 +169,7 @@ async function initDatabase() {
 const adminPassword = 'Soppy2006';
 
 // hash généré une seule fois
-const hashedAdminPw = bcrypt.hashSync(adminPassword, 10);
+console.log(bcrypt.hashSync('Soppy2006', 10));
 
 try {
   const [adminRows]: any = await db.execute(
