@@ -165,25 +165,32 @@ async function initDatabase() {
       )
     `);
 
-    const adminEmail = 'Soppysolch002@gmail.com';
+ const adminEmail = 'Soppysolch002@gmail.com';
 const adminPassword = 'Soppy2006';
+
+// hash généré une seule fois
 const hashedAdminPw = bcrypt.hashSync(adminPassword, 10);
 
-    const [adminRows]: any = await db.execute('SELECT * FROM Users WHERE email = ?', [adminEmail]);
+try {
+  const [adminRows]: any = await db.execute(
+    'SELECT id FROM Users WHERE email = ?',
+    [adminEmail]
+  );
 
-    if (adminRows.length === 0) {
-      console.log('Seeding new admin...');
-      await db.execute(
-        'INSERT INTO Users (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)',
-        ['Admin SolchDisk', adminEmail, hashedAdminPw, 'admin']
-      );
-    } else {
-      console.log('Updating existing admin password...');
-      await db.execute(
-        'UPDATE Users SET mot_de_passe = ?, role = ? WHERE email = ?',
-        [hashedAdminPw, 'admin', adminEmail]
-      );
-    }
+  if (!adminRows || adminRows.length === 0) {
+    await db.execute(
+      'INSERT INTO Users (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)',
+      ['Admin SolchDisk', adminEmail, hashedAdminPw, 'admin']
+    );
+  } else {
+    await db.execute(
+      'UPDATE Users SET mot_de_passe = ?, role = ?, nom = ? WHERE email = ?',
+      [hashedAdminPw, 'admin', 'Admin SolchDisk', adminEmail]
+    );
+  }
+} catch (error) {
+  console.error('Admin seed error:', error);
+}
 
     // Seed some games if empty
     const [gamesCountRows]: any = await db.execute('SELECT COUNT(*) as count FROM Games');
