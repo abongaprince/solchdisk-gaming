@@ -165,34 +165,40 @@ async function initDatabase() {
       )
     `);
 
+// --- SECTION SEED ADMIN ---
 const adminEmail = 'Soppysolch002@gmail.com';
 const adminPassword = 'Soppy2006';
 
-// FIX: On génère le hash ET on le stocke dans une variable
-const hashedAdminPw = bcrypt.hashSync(adminPassword, 10);
-
 try {
+  // 1. On génère le hash correctement et on le stocke dans une variable
+  const hashedAdminPw = await bcrypt.hash(adminPassword, 10); 
+  console.log("Tentative de configuration de l'admin...");
+
+  // 2. On vérifie si l'admin existe déjà
   const [adminRows]: any = await db.execute(
     'SELECT id FROM Users WHERE email = ?',
     [adminEmail]
   );
 
   if (!adminRows || adminRows.length === 0) {
-    console.log("Création du compte admin...");
+    // 3. Création si inexistant
+    console.log("L'admin n'existe pas. Création en cours...");
     await db.execute(
-      'INSERT INTO Users (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)',
-      ['Admin SolchDisk', adminEmail, hashedAdminPw, 'admin']
+      'INSERT INTO Users (nom, prenom, email, mot_de_passe, role) VALUES (?, ?, ?, ?, ?)',
+      ['Admin', 'SolchDisk', adminEmail, hashedAdminPw, 'admin']
     );
+    console.log("✅ Compte admin créé avec succès !");
   } else {
-    console.log("Mise à jour du compte admin existant...");
+    // 4. Mise à jour si déjà là (pour être sûr du mot de passe et du rôle)
+    console.log("L'admin existe déjà. Mise à jour des droits...");
     await db.execute(
       'UPDATE Users SET mot_de_passe = ?, role = ?, nom = ? WHERE email = ?',
       [hashedAdminPw, 'admin', 'Admin SolchDisk', adminEmail]
     );
+    console.log("✅ Compte admin mis à jour.");
   }
-  console.log("✅ Admin configuré avec succès.");
-} catch (error) {
-  console.error('Admin seed error:', error);
+} catch (seedError) {
+  console.error('❌ Erreur lors du seeding de l'admin:', seedError);
 }
 
     // Seed some games if empty
