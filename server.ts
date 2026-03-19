@@ -592,10 +592,9 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+// Remplace ton bloc final par celui-ci
+const PORT = process.env.PORT || 3000; // Utilise le port de Railway s'il existe
 
-startServer();
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Serveur actif sur le port ${PORT}`);
+});
