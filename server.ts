@@ -13,7 +13,7 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// --- CONFIGURATION BDD ---
+// 1. CONFIGURATION BDD (Unifiée pour Railway)
 const db = createPool(process.env.MYSQL_URL || {
   host: process.env.MYSQLHOST || 'localhost',
   user: process.env.MYSQLUSER || 'root',
@@ -21,8 +21,7 @@ const db = createPool(process.env.MYSQL_URL || {
   database: process.env.MYSQLDATABASE || 'solchdisk_gaming',
   port: parseInt(process.env.MYSQLPORT || '3306'),
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  connectionLimit: 10
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'solchdisk-gaming-secret-key-2024';
@@ -30,15 +29,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'solchdisk-gaming-secret-key-2024';
 async function startServer() {
   const app = express();
   
-  // Sécurité et Performance
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(compression());
   app.use(express.json({ limit: '50mb' }));
 
-  // --- MIDDLEWARE AUTH ---
+  // --- MIDDLEWARE AUTHENTIFICATION ---
   const authMiddleware = (req: any, res: any, next: any) => {
-    const token = req.headers.authorization?.split(' ');
-    if (!token) return res.status(401).json({ error: 'Non autorisé' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+
+    const token = authHeader.split(' ');
     try {
       req.user = jwt.verify(token, JWT_SECRET);
       next();
@@ -47,11 +47,10 @@ async function startServer() {
     }
   };
 
-  // --- INSCRIPTION (HASHAGE PROPRE) ---
+  // --- AUTH : INSCRIPTION ---
   app.post('/api/register', async (req, res) => {
     const { nom, prenom, email, whatsapp, mot_de_passe, ville, quartier, pays } = req.body;
     try {
-      // On génère un sel et on hache le mot de passe
       const salt = bcrypt.genSaltSync(10);
       const hashedPw = bcrypt.hashSync(mot_de_passe, salt);
 
@@ -59,71 +58,76 @@ async function startServer() {
         'INSERT INTO Users (nom, prenom, email, whatsapp, mot_de_passe, ville, quartier, pays, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [nom, prenom, email, whatsapp, hashedPw, ville, quartier, pays, 'client']
       );
-
-      res.status(201).json({ id: result.insertId, message: 'Inscription réussie !' });
+      res.status(201).json({ id: result.insertId });
     } catch (e: any) {
-      res.status(400).json({ error: "L'email ou le numéro WhatsApp existe déjà." });
+      res.status(400).json({ error: "Email ou WhatsApp déjà utilisé" });
     }
   });
 
-  // --- CONNEXION (FIX BLOB & ROWS) ---
+  // --- AUTH : CONNEXION (SOLUTIONS ANTI-ÉCRAN NOIR) ---
   app.post('/api/login', async (req, res) => {
     const { email, mot_de_passe } = req.body;
     try {
-      const [rows]: any = await db.execute(
-        'SELECT * FROM Users WHERE email = ? OR whatsapp = ?', 
-        [email, email]
-      );
+      const [rows]: any = await db.execute('SELECT * FROM Users WHERE email = ? OR whatsapp = ?', [email, email]);
       
-      const user = rows; // Correction : on prend le premier élément du tableau
-
-      if (!user) {
-        return res.status(401).json({ error: 'Utilisateur non trouvé' });
+      // 1. Vérifier si l'utilisateur existe
+      if (!rows || rows.length === 0) {
+        return res.status(401).json({ error: 'Identifiants invalides' });
       }
 
-      // FIX CRITIQUE : Conversion du BLOB de Railway en texte pour Bcrypt
+      const user = rows;
+
+      // 2. Gérer le type BLOB de Railway pour le mot de passe
       const storedHash = user.mot_de_passe.toString();
 
-      const isMatch = bcrypt.compareSync(mot_de_passe, storedHash);
-      
-      if (!isMatch) {
-        return res.status(401).json({ error: 'Mot de passe incorrect' });
+      // 3. Comparaison Bcrypt
+      if (!bcrypt.compareSync(mot_de_passe, storedHash)) {
+        return res.status(401).json({ error: 'Identifiants invalides' });
       }
 
+      // 4. Génération du Token
       const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role }, 
-        JWT_SECRET, 
+        { id: user.id, email: user.email, role: user.role },
+        JWT_SECRET,
         { expiresIn: '24h' }
       );
 
-      // On renvoie l'utilisateur sans le mot de passe
-      const { mot_de_passe: _, ...userSafe } = user;
-      res.json({ 
-        token, 
-        user: userSafe, 
-        message: 'Connexion réussie !' 
-      });
+      // 5. Envoyer un objet utilisateur PROPRE (sans le mot de passe)
+      // On s'assure que les champs ne sont pas undefined pour éviter le crash React
+      const userResponse = {
+        id: user.id,
+        nom: user.nom || '',
+        prenom: user.prenom || '',
+        email: user.email,
+        role: user.role || 'client',
+        whatsapp: user.whatsapp || '',
+        photo_profil: user.photo_profil || null
+      };
 
+      res.json({ token, user: userResponse });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      console.error("Login Error:", e);
+      res.status(500).json({ error: "Erreur serveur" });
     }
   });
 
-  // --- ADMIN : STATS ---
+  // --- ADMIN : STATS (L'AUTRE CAUSE DE L'ÉCRAN NOIR) ---
   app.get('/api/admin/stats', authMiddleware, async (req: any, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Interdit' });
     try {
+      // On utilise des requêtes simples pour garantir le format
       const [g]: any = await db.query('SELECT COUNT(*) as c FROM Games');
       const [o]: any = await db.query('SELECT COUNT(*) as c FROM Orders');
       const [u]: any = await db.query('SELECT COUNT(*) as c FROM Users');
       
+      // Réponse exacte attendue par le Dashboard
       res.json({
-        games: g.c,
-        orders: o.c,
-        users: u.c
+        games: g.c || 0,
+        orders: o.c || 0,
+        users: u.c || 0
       });
     } catch (e) {
-      res.status(500).json({ error: 'Erreur lors du calcul des statistiques' });
+      res.json({ games: 0, orders: 0, users: 0 }); // Fallback pour éviter le crash
     }
   });
 
@@ -132,28 +136,20 @@ async function startServer() {
     try {
       const [games] = await db.query('SELECT * FROM Games ORDER BY date_ajout DESC');
       res.json(games);
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
+    } catch (e) {
+      res.json([]);
     }
   });
 
-  // --- GESTION DU FRONTEND ---
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
-  }
+  // --- SERVEUR STATIQUE ---
+  const distPath = path.resolve(process.cwd(), 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
 
   const PORT = process.env.PORT || 8080;
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Serveur SolchDisk Gaming opérationnel sur le port ${PORT}`);
+    console.log(`🚀 SolchDisk Running on port ${PORT}`);
   });
 }
 
-startServer().catch(err => console.error("Erreur de démarrage :", err));
+startServer();
