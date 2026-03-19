@@ -13,28 +13,30 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 1. CONFIGURATION BDD ULTRA-ROBUSTE
-// On utilise MYSQL_URL si elle existe, sinon on décompose
+// 1. CONFIGURATION BDD (Priorité à MYSQL_URL de Railway)
 const dbConfig = process.env.MYSQL_URL || {
   host: (process.env.DB_HOST || process.env.MYSQLHOST || 'localhost').trim(),
   user: (process.env.DB_USER || process.env.MYSQLUSER || 'root').trim(),
   password: (process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '').trim(),
   database: (process.env.DB_NAME || process.env.MYSQLDATABASE || 'railway').trim(),
   port: parseInt((process.env.DB_PORT || process.env.MYSQLPORT || '3306').trim()),
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 };
 
 const db = createPool(dbConfig);
 const JWT_SECRET = process.env.JWT_SECRET || 'solchdisk-gaming-secret-key-2024';
 
-// 2. INITIALISATION AVEC LOGS D'ERREURS DÉTAILLÉS
+// 2. INITIALISATION BDD & SEED ADMIN
 async function initDatabase() {
   try {
-    console.log('--- Démarrage de l\'initialisation BDD ---');
+    console.log('--- Tentative de connexion MySQL ---');
     const connection = await db.getConnection();
     console.log('✅ Connexion MySQL réussie !');
     connection.release();
 
-    // Création de la table Users si elle n'existe pas
+    // Table Users
     await db.execute(`
       CREATE TABLE IF NOT EXISTS Users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,75 +54,76 @@ async function initDatabase() {
       )
     `);
 
-    // --- CRÉATION DE L'ADMIN ---
+    // --- CRÉATION AUTOMATIQUE DE L'ADMIN ---
     const adminEmail = 'Soppysolch002@gmail.com';
-    const hashedAdminPw = bcrypt.hashSync('Soppy2006', 10);
-
     const [rows]: any = await db.execute('SELECT id FROM Users WHERE email = ?', [adminEmail]);
 
     if (!rows || rows.length === 0) {
-      console.log("Admin introuvable, création en cours...");
+      const hashedAdminPw = bcrypt.hashSync('Soppy2006', 10);
       await db.execute(
         'INSERT INTO Users (nom, prenom, email, mot_de_passe, role, whatsapp) VALUES (?, ?, ?, ?, ?, ?)',
         ['Admin', 'SolchDisk', adminEmail, hashedAdminPw, 'admin', '00000000']
       );
-      console.log("✅ Admin créé avec succès.");
+      console.log("✅ Compte admin créé (Soppysolch002@gmail.com / Soppy2006)");
     } else {
-      console.log("Admin déjà présent.");
+      console.log("ℹ️ Admin déjà configuré.");
     }
-
   } catch (error) {
-    console.error('❌ ERREUR CRITIQUE BDD :', error.message);
-    // On ne coupe pas le serveur ici pour laisser Express tenter de démarrer
+    console.error('❌ ERREUR INITIALISATION BDD :', error.message);
   }
 }
 
-// 3. LANCEMENT DU SERVEUR EXPRESS
+// 3. LANCEMENT DU SERVEUR
 async function startServer() {
   const app = express();
   
-  // Middleware de base
+  // Middlewares de sécurité et compression
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(compression());
   app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Init BDD avant de servir les routes
   await initDatabase();
 
-  // --- ROUTE DE TEST (Pour vérifier si l'app répond) ---
-  app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'Le serveur répond !' }));
+  // --- ROUTES API ---
+  app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'Serveur SolchDisk actif' }));
 
-  // Route Login
   app.post('/api/login', async (req, res) => {
     const { email, mot_de_passe } = req.body;
     try {
       const [rows]: any = await db.execute('SELECT * FROM Users WHERE email = ? OR whatsapp = ?', [email, email]);
-      const user = rows[0];
+      const user = rows;
       if (!user || !bcrypt.compareSync(mot_de_passe, user.mot_de_passe)) {
         return res.status(401).json({ error: 'Identifiants invalides' });
       }
       const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-      res.json({ token, user });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+      res.json({ token, user: { id: user.id, nom: user.nom, email: user.email, role: user.role } });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
-  // Gestion du Frontend en Production
-  const distPath = path.join(__dirname, 'dist');
+  // --- GESTION DU FRONTEND (Dossier dist) ---
+  // On utilise path.resolve pour être sûr du chemin sur Railway
+  const distPath = path.resolve(process.cwd(), 'dist');
   app.use(express.static(distPath));
+
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'), (err) => {
-      if (err) res.status(404).send("Frontend non trouvé. Avez-vous fait 'npm run build' ?");
+      if (err) {
+        res.status(404).send("Erreur : Le frontend (dossier dist) n'a pas été trouvé. Vérifiez le build.");
+      }
     });
   });
 
-  // --- PORT OBLIGATOIRE POUR RAILWAY ---
-  const PORT = process.env.PORT || 3000;
+  // --- PORT DYNAMIQUE RAILWAY (8080 par défaut) ---
+  const PORT = process.env.PORT || 8080;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 SERVEUR DÉMARRÉ SUR LE PORT ${PORT}`);
+    console.log(`📡 URL Locale : http://0.0.0.0:${PORT}`);
   });
 }
 
-// Lancement global
 startServer().catch(err => {
-  console.error("ERREUR FATALE AU DÉMARRAGE :", err);
+  console.error("❌ CRASH AU DÉMARRAGE :", err);
 });
