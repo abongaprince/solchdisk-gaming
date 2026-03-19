@@ -165,11 +165,11 @@ async function initDatabase() {
       )
     `);
 
- const adminEmail = 'Soppysolch002@gmail.com';
+const adminEmail = 'Soppysolch002@gmail.com';
 const adminPassword = 'Soppy2006';
 
-// hash généré une seule fois
-console.log(bcrypt.hashSync('Soppy2006', 10));
+// FIX: On génère le hash ET on le stocke dans une variable
+const hashedAdminPw = bcrypt.hashSync(adminPassword, 10);
 
 try {
   const [adminRows]: any = await db.execute(
@@ -178,16 +178,19 @@ try {
   );
 
   if (!adminRows || adminRows.length === 0) {
+    console.log("Création du compte admin...");
     await db.execute(
       'INSERT INTO Users (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)',
       ['Admin SolchDisk', adminEmail, hashedAdminPw, 'admin']
     );
   } else {
+    console.log("Mise à jour du compte admin existant...");
     await db.execute(
       'UPDATE Users SET mot_de_passe = ?, role = ?, nom = ? WHERE email = ?',
       [hashedAdminPw, 'admin', 'Admin SolchDisk', adminEmail]
     );
   }
+  console.log("✅ Admin configuré avec succès.");
 } catch (error) {
   console.error('Admin seed error:', error);
 }
